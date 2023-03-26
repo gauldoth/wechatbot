@@ -24,3 +24,7 @@ copy config.dev.json config.json
 go run main.go
 
 启动前需替换config中的api_key
+
+# Reset the context of a conversation
+Now the context is preserved by default，use `gpt:reset` to reset context
+

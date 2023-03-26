@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/869413421/wechatbot/config"
 )
@@ -47,18 +48,24 @@ type ChatGPTMessage struct {
 	Content string `json:"content"`
 }
 
+var conversation []ChatGPTMessage
+
 // Completions gtp文本模型回复
 // curl https://api.openai.com/v1/chat/completions
 // -H "Content-Type: application/json"
 // -H "Authorization: Bearer your chatGPT key"
 // -d '{"model": "gpt-3.5-turbo", "messages": [{"role":"system", "content":"You are a assistant"}, {"role":"user", "content": "give me good song"}], "temperature": 0, "max_tokens": 7}'
 func Completions(msg string) (string, error) {
+	if strings.Contains(msg, "gpt:reset") {
+		conversation = make([]ChatGPTMessage, 0)
+		conversation = append(conversation, ChatGPTMessage{Role: "system", Content: "You are a helpful assistant."})
+		return "conversation initialized", nil
+	}
+
+	conversation = append(conversation, ChatGPTMessage{Role: "user", Content: msg})
 	requestBody := ChatGPTRequestBody{
 		Model: "gpt-3.5-turbo",
-		Messages: []ChatGPTMessage{
-			{Role: "system", Content: "You are a helpful assistant."},
-			{Role: "user", Content: msg},
-		},
+		Messages: conversation,
 		MaxTokens:        2048,
 		Temperature:      0.7,
 		TopP:             1,
@@ -113,9 +120,16 @@ func Completions(msg string) (string, error) {
 	if len(gptResponseBody.Choices) > 0 {
 		for _, v := range gptResponseBody.Choices {
 			reply = v.Message.Content
+			conversation = append(conversation, ChatGPTMessage{Role: "assistant", Content: reply})
 			break
 		}
 	}
 	log.Printf("gpt response text: %s \n", reply)
 	return reply, nil
+}
+
+
+func init() {
+	conversation = make([]ChatGPTMessage, 0)
+	conversation = append(conversation, ChatGPTMessage{Role: "system", Content: "You are a helpful assistant."})
 }
