@@ -15,6 +15,8 @@ type Configuration struct {
 	AutoPass bool `json:"auto_pass"`
 	//代理地址
 	Proxy string `json:"proxy"`
+	//回复信息时，添加该前缀
+	ReplyPrefix string `json:"reply_prefix"`
 }
 
 var config *Configuration
@@ -42,6 +44,7 @@ func LoadConfig() *Configuration {
 		ApiKey := os.Getenv("ApiKey")
 		AutoPass := os.Getenv("AutoPass")
 		Proxy := os.Getenv("Proxy")
+		ReplyPrefix :=os.Getenv("ReplyPrefixReplyPrefix")
 		if ApiKey != "" {
 			config.ApiKey = ApiKey
 		}
@@ -50,6 +53,9 @@ func LoadConfig() *Configuration {
 		}
 		if Proxy != "" {
 			config.Proxy = Proxy
+		}
+		if ReplyPrefix != "" {
+			config.ReplyPrefix = ReplyPrefix
 		}
 	})
 	return config

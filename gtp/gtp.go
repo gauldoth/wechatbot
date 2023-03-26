@@ -22,6 +22,7 @@ type ChatGPTResponseBody struct {
 	Model   string                 `json:"model"`
 	Choices []ChoiceItem           `json:"choices"`
 	Usage   map[string]interface{} `json:"usage"`
+	Error   map[string]interface{} `json:"error"`
 }
 
 type ChoiceItem struct {
@@ -48,24 +49,31 @@ type ChatGPTMessage struct {
 	Content string `json:"content"`
 }
 
-var conversation []ChatGPTMessage
+var conversations map[string][]ChatGPTMessage
 
 // Completions gtp文本模型回复
 // curl https://api.openai.com/v1/chat/completions
 // -H "Content-Type: application/json"
 // -H "Authorization: Bearer your chatGPT key"
 // -d '{"model": "gpt-3.5-turbo", "messages": [{"role":"system", "content":"You are a assistant"}, {"role":"user", "content": "give me good song"}], "temperature": 0, "max_tokens": 7}'
-func Completions(msg string) (string, error) {
-	if strings.Contains(msg, "gpt:reset") {
-		conversation = make([]ChatGPTMessage, 0)
+func Completions(msg string, conversationKey string) (string, error) {
+	if _, ok := conversations[conversationKey]; !ok {
+		conversation := make([]ChatGPTMessage, 0)
 		conversation = append(conversation, ChatGPTMessage{Role: "system", Content: "You are a helpful assistant."})
+		conversations[conversationKey] = conversation
+	}
+
+	if strings.Contains(msg, "gpt:reset") {
+		conversation := make([]ChatGPTMessage, 0)
+		conversation = append(conversation, ChatGPTMessage{Role: "system", Content: "You are a helpful assistant."})
+		conversations[conversationKey] = conversation
 		return "conversation initialized", nil
 	}
 
-	conversation = append(conversation, ChatGPTMessage{Role: "user", Content: msg})
+	conversations[conversationKey] = append(conversations[conversationKey], ChatGPTMessage{Role: "user", Content: msg})
 	requestBody := ChatGPTRequestBody{
 		Model: "gpt-3.5-turbo",
-		Messages: conversation,
+		Messages: conversations[conversationKey],
 		MaxTokens:        2048,
 		Temperature:      0.7,
 		TopP:             1,
@@ -120,9 +128,11 @@ func Completions(msg string) (string, error) {
 	if len(gptResponseBody.Choices) > 0 {
 		for _, v := range gptResponseBody.Choices {
 			reply = v.Message.Content
-			conversation = append(conversation, ChatGPTMessage{Role: "assistant", Content: reply})
+			conversations[conversationKey] = append(conversations[conversationKey], ChatGPTMessage{Role: "assistant", Content: reply})
 			break
 		}
+	} else {
+		return string(body), nil
 	}
 	log.Printf("gpt response text: %s \n", reply)
 	return reply, nil
@@ -130,6 +140,5 @@ func Completions(msg string) (string, error) {
 
 
 func init() {
-	conversation = make([]ChatGPTMessage, 0)
-	conversation = append(conversation, ChatGPTMessage{Role: "system", Content: "You are a helpful assistant."})
+	conversations = make(map[string][]ChatGPTMessage)
 }

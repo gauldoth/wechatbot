@@ -5,6 +5,8 @@ import (
 	"github.com/eatmoreapple/openwechat"
 	"log"
 	"strings"
+
+	"github.com/869413421/wechatbot/config"
 )
 
 var _ MessageHandlerInterface = (*GroupMessageHandler)(nil)
@@ -30,8 +32,19 @@ func NewGroupMessageHandler() MessageHandlerInterface {
 func (g *GroupMessageHandler) ReplyText(msg *openwechat.Message) error {
 	// 接收群消息
 	sender, err := msg.Sender()
+	if err != nil {
+		log.Printf("msg.Sender error: %v \n", err)
+		msg.ReplyText("错误：无法获得发送群组信息")
+		return err
+	}
+	senderInGroup, err := msg.SenderInGroup()
+	if err != nil {
+		log.Printf("msg.SenderInGroup error: %v \n", err)
+		msg.ReplyText("错误：无法获得发送者信息")
+		return err
+	}
 	group := openwechat.Group{sender}
-	log.Printf("Received Group %v Text Msg : %v", group.NickName, msg.Content)
+	log.Printf("Received Msg, Group %v Sender %v: %v", group.NickName, senderInGroup.NickName, msg.Content)
 
 	// 不是@的不处理
 	if !msg.IsAt() {
@@ -41,7 +54,7 @@ func (g *GroupMessageHandler) ReplyText(msg *openwechat.Message) error {
 	// 替换掉@文本，然后向GPT发起请求
 	replaceText := "@" + sender.Self.NickName
 	requestText := strings.TrimSpace(strings.ReplaceAll(msg.Content, replaceText, ""))
-	reply, err := gtp.Completions(requestText)
+	reply, err := gtp.Completions(requestText, group.NickName + "|" + senderInGroup.NickName)
 	if err != nil {
 		log.Printf("gtp request error: %v \n", err)
 		msg.ReplyText("机器人神了，我一会发现了就去修。")
@@ -61,8 +74,15 @@ func (g *GroupMessageHandler) ReplyText(msg *openwechat.Message) error {
 	// 回复@我的用户
 	reply = strings.TrimSpace(reply)
 	reply = strings.Trim(reply, "\n")
+
 	atText := "@" + groupSender.NickName
-	replyText := atText + reply
+	replyText := atText + " " + reply
+
+	replyPrefix := config.LoadConfig().ReplyPrefix
+	if replyPrefix != "" {
+		replyText = replyPrefix + replyText
+	}
+
 	_, err = msg.ReplyText(replyText)
 	if err != nil {
 		log.Printf("response group error: %v \n", err)
